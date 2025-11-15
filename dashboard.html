@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaGuard Dashboard v4.0</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body { 
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; 
+            padding: 1rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 2rem;
+            width: 100%;
+            max-width: 1200px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 1.5rem;
+            font-size: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        
+        /* Status AI Box */
+        .status-box {
+            padding: 1rem;
+            border-radius: 12px;
+            text-align: center;
+            font-weight: 600;
+            margin-bottom: 2rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        .status-box.aman { background: linear-gradient(135deg, #11998e, #38ef7d); color: white; }
+        .status-box.bahaya { 
+            background: linear-gradient(135deg, #eb3349, #f45c43); 
+            color: white;
+            animation: pulse 1s infinite;
+        }
+        .status-box.pending { background: linear-gradient(135deg, #f093fb, #f5576c); color: white; }
+        .status-box.error { background: #ffc107; color: #333; }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        
+        /* Metrics Grid */
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .metric {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .metric-label {
+            color: #666;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.5rem;
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #667eea;
+        }
+        
+        .metric-value.loading::after {
+            content: '...';
+            animation: dots 1.5s infinite;
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+        
+        /* Chart Container */
+        .chart-wrapper {
+            margin-bottom: 2rem;
+        }
+        
+        .chart-controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        
+        .chart-controls select,
+        .chart-controls button {
+            padding: 0.5rem 1rem;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            background: white;
+            color: #667eea;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .chart-controls button:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+            background: white;
+            border-radius: 12px;
+            padding: 1rem;
+        }
+        
+        /* Footer */
+        .footer {
+            text-align: center;
+            color: #999;
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        
+        .connection-status {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        
+        .connection-status.online {
+            background: #28a745;
+            color: white;
+        }
+        
+        .connection-status.offline {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .connection-status.checking {
+            background: #ffc107;
+            color: #333;
+        }
+        
+        /* Debug Panel (Toggle) */
+        .debug-panel {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        
+        .debug-panel.active {
+            display: block;
+        }
+        
+        .debug-toggle {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 0.75rem 1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            font-weight: 600;
+        }
+        
+        @media (max-width: 768px) {
+            .container { padding: 1rem; }
+            h1 { font-size: 1.5rem; }
+            .metrics { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            <i class="fas fa-water"></i>
+            AquaGuard QC Monitor
+        </h1>
+        
+        <!-- Status AI -->
+        <div id="statusBox" class="status-box checking">
+            <i class="fas fa-sync fa-spin"></i>
+            <span id="statusText">Memuat status sistem...</span>
+        </div>
+        
+        <!-- Metrics -->
+        <div class="metrics">
+            <div class="metric">
+                <div class="metric-label"><i class="fas fa-tint"></i> TDS</div>
+                <div class="metric-value loading" id="tdsValue">-</div>
+                <small>PPM</small>
+            </div>
+            <div class="metric">
+                <div class="metric-label"><i class="fas fa-eye"></i> Kekeruhan</div>
+                <div class="metric-value loading" id="kekeruhanValue">-</div>
+                <small>NTU</small>
+            </div>
+            <div class="metric">
+                <div class="metric-label"><i class="fas fa-thermometer-half"></i> Suhu</div>
+                <div class="metric-value loading" id="suhuValue">-</div>
+                <small>°C</small>
+            </div>
+        </div>
+        
+        <!-- Chart -->
+        <div class="chart-wrapper">
+            <div class="chart-controls">
+                <select id="timeRange">
+                    <option value="50">50 Data Terakhir</option>
+                    <option value="100">100 Data Terakhir</option>
+                    <option value="200">200 Data Terakhir</option>
+                </select>
+                <button onclick="refreshAll()">
+                    <i class="fas fa-sync"></i> Refresh
+                </button>
+                <button onclick="exportCSV()">
+                    <i class="fas fa-download"></i> Export CSV
+                </button>
+            </div>
+            <div class="chart-container">
+                <canvas id="mainChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <span>
+                Status: 
+                <span id="connectionStatus" class="connection-status checking">Checking...</span>
+            </span>
+            <span>
+                Update Terakhir: 
+                <span id="lastUpdate">-</span>
+            </span>
+        </div>
+        
+        <!-- Debug Panel -->
+        <div id="debugPanel" class="debug-panel">
+            <strong>Debug Log:</strong>
+            <pre id="debugLog"></pre>
+        </div>
+    </div>
+    
+    <button class="debug-toggle" onclick="toggleDebug()">
+        <i class="fas fa-bug"></i> Debug
+    </button>
+
+    <script>
+        // ==================== CONFIG ====================
+        // [FIX NGROK] Gunakan relative URL (otomatis ikut protocol halaman)
+        const API_BASE = window.location.origin;  // Auto-detect: http://localhost:5000 ATAU https://abc.ngrok.io
+        const REFRESH_INTERVAL = 5000;  // 5 detik
+        const CHART_REFRESH_INTERVAL = 30000;  // 30 detik
+        
+        // ==================== DOM ELEMENTS ====================
+        const statusBox = document.getElementById('statusBox');
+        const statusText = document.getElementById('statusText');
+        const tdsValue = document.getElementById('tdsValue');
+        const kekeruhanValue = document.getElementById('kekeruhanValue');
+        const suhuValue = document.getElementById('suhuValue');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const lastUpdate = document.getElementById('lastUpdate');
+        const timeRange = document.getElementById('timeRange');
+        const debugPanel = document.getElementById('debugPanel');
+        const debugLog = document.getElementById('debugLog');
+        
+        let mainChart = null;
+        let debugMessages = [];
+        
+        // ==================== UTILITY FUNCTIONS ====================
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] [${type.toUpperCase()}] ${message}`;
+            console.log(logEntry);
+            
+            debugMessages.unshift(logEntry);
+            if (debugMessages.length > 50) debugMessages.pop();
+            debugLog.textContent = debugMessages.join('\n');
+        }
+        
+        function toggleDebug() {
+            debugPanel.classList.toggle('active');
+        }
+        
+        function updateConnectionStatus(status) {
+            connectionStatus.className = `connection-status ${status}`;
+            connectionStatus.textContent = status === 'online' ? 'Online' : 
+                                          status === 'offline' ? 'Offline' : 'Checking';
+        }
+        
+        // ==================== API CALLS ====================
+        async function fetchLatestData() {
+            try {
+                log('Fetching latest data...');
+                const response = await fetch(`${API_BASE}/data/terbaru`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.status === 'sukses' && result.data) {
+                    const data = result.data;
+                    
+                    // Update metrics
+                    tdsValue.textContent = data.tds_ppm?.toFixed(1) || 'N/A';
+                    kekeruhanValue.textContent = data.kekeruhan_ntu?.toFixed(2) || 'N/A';
+                    suhuValue.textContent = data.suhu_celsius?.toFixed(1) || 'N/A';
+                    
+                    // Remove loading class
+                    tdsValue.classList.remove('loading');
+                    kekeruhanValue.classList.remove('loading');
+                    suhuValue.classList.remove('loading');
+                    
+                    // Update timestamp
+                    const ts = new Date(data['@timestamp']);
+                    lastUpdate.textContent = ts.toLocaleString('id-ID');
+                    
+                    updateConnectionStatus('online');
+                    log(`✅ Data updated: TDS=${data.tds_ppm}, Kekeruhan=${data.kekeruhan_ntu}`, 'success');
+                } else {
+                    throw new Error(result.message || 'Data tidak valid');
+                }
+                
+            } catch (error) {
+                log(`❌ Error fetching latest data: ${error.message}`, 'error');
+                updateConnectionStatus('offline');
+                
+                tdsValue.textContent = 'Error';
+                kekeruhanValue.textContent = 'Error';
+                suhuValue.textContent = 'Error';
+            }
+        }
+        
+        async function fetchAIStatus() {
+            try {
+                log('Checking AI status...');
+                const response = await fetch(`${API_BASE}/ai/status`);
+                const result = await response.json();
+                
+                // Update UI based on status
+                statusBox.className = `status-box ${result.status.toLowerCase()}`;
+                
+                if (result.status === 'BAHAYA') {
+                    statusText.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${result.message}`;
+                    log(`🚨 ALERT: ${result.message}`, 'warning');
+                } else if (result.status === 'AMAN') {
+                    statusText.innerHTML = `<i class="fas fa-check-circle"></i> ${result.message}`;
+                } else if (result.status === 'PENDING') {
+                    statusText.innerHTML = `<i class="fas fa-clock"></i> ${result.message}`;
+                } else {
+                    statusText.innerHTML = `<i class="fas fa-question-circle"></i> ${result.message}`;
+                }
+                
+            } catch (error) {
+                log(`⚠️ AI status unavailable: ${error.message}`, 'warning');
+                statusBox.className = 'status-box error';
+                statusText.innerHTML = '<i class="fas fa-exclamation"></i> AI Engine tidak tersedia';
+            }
+        }
+        
+        async function fetchHistoricalData(size = 50) {
+            try {
+                log(`Fetching historical data (size=${size})...`);
+                const response = await fetch(`${API_BASE}/data/historis?size=${size}`);
+                const result = await response.json();
+                
+                if (result.status === 'sukses' && result.data) {
+                    updateChart(result.data);
+                    log(`✅ Chart updated with ${result.data.length} points`, 'success');
+                } else {
+                    throw new Error(result.message || 'Data tidak valid');
+                }
+                
+            } catch (error) {
+                log(`❌ Error fetching historical data: ${error.message}`, 'error');
+            }
+        }
+        
+        // ==================== CHART RENDERING ====================
+        function updateChart(data) {
+            const labels = [];
+            const tdsData = [];
+            const kekeruhanData = [];
+            const suhuData = [];
+            
+            data.forEach(item => {
+                const ts = new Date(item['@timestamp']);
+                labels.push(ts.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
+                tdsData.push(item.tds_ppm);
+                kekeruhanData.push(item.kekeruhan_ntu);
+                suhuData.push(item.suhu_celsius);
+            });
+            
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            
+            if (mainChart) {
+                // Update existing chart
+                mainChart.data.labels = labels;
+                mainChart.data.datasets[0].data = tdsData;
+                mainChart.data.datasets[1].data = kekeruhanData;
+                mainChart.data.datasets[2].data = suhuData;
+                mainChart.update();
+            } else {
+                // Create new chart
+                mainChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'TDS (PPM)',
+                                data: tdsData,
+                                borderColor: '#667eea',
+                                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                                fill: true,
+                                tension: 0.4,
+                                yAxisID: 'yTDS'
+                            },
+                            {
+                                label: 'Kekeruhan (NTU)',
+                                data: kekeruhanData,
+                                borderColor: '#f093fb',
+                                backgroundColor: 'rgba(240, 147, 251, 0.1)',
+                                fill: true,
+                                tension: 0.4,
+                                yAxisID: 'yKekeruhan'
+                            },
+                            {
+                                label: 'Suhu (°C)',
+                                data: suhuData,
+                                borderColor: '#f5576c',
+                                backgroundColor: 'rgba(245, 87, 108, 0.1)',
+                                fill: true,
+                                tension: 0.4,
+                                yAxisID: 'ySuhu'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: { font: { family: 'Inter', size: 12 } }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(0,0,0,0.8)',
+                                padding: 12,
+                                titleFont: { family: 'Inter', size: 14 },
+                                bodyFont: { family: 'Inter', size: 12 }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: { display: false },
+                                ticks: { font: { family: 'Inter' } }
+                            },
+                            yTDS: {
+                                type: 'linear',
+                                position: 'left',
+                                title: { display: true, text: 'TDS (PPM)', font: { family: 'Inter' } },
+                                ticks: { font: { family: 'Inter' } }
+                            },
+                            yKekeruhan: {
+                                type: 'linear',
+                                position: 'right',
+                                title: { display: true, text: 'Kekeruhan (NTU)', font: { family: 'Inter' } },
+                                grid: { drawOnChartArea: false },
+                                ticks: { font: { family: 'Inter' } }
+                            },
+                            ySuhu: {
+                                type: 'linear',
+                                display: false
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        
+        // ==================== EXPORT FUNCTION ====================
+        function exportCSV() {
+            log('Exporting data to CSV...');
+            const size = timeRange.value;
+            
+            fetch(`${API_BASE}/data/historis?size=${size}`)
+                .then(res => res.json())
+                .then(result => {
+                    if (result.status !== 'sukses') throw new Error(result.message);
+                    
+                    let csv = 'Timestamp,TDS (PPM),Kekeruhan (NTU),Suhu (°C)\n';
+                    result.data.forEach(item => {
+                        csv += `${item['@timestamp']},${item.tds_ppm},${item.kekeruhan_ntu},${item.suhu_celsius}\n`;
+                    });
+                    
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `aquaguard_data_${Date.now()}.csv`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    
+                    log('✅ CSV exported successfully', 'success');
+                })
+                .catch(error => {
+                    log(`❌ Export failed: ${error.message}`, 'error');
+                    alert('Gagal export data: ' + error.message);
+                });
+        }
+        
+        // ==================== REFRESH FUNCTIONS ====================
+        function refreshAll() {
+            log('Manual refresh triggered');
+            updateConnectionStatus('checking');
+            fetchLatestData();
+            fetchAIStatus();
+            fetchHistoricalData(timeRange.value);
+        }
+        
+        // ==================== EVENT LISTENERS ====================
+        timeRange.addEventListener('change', () => {
+            fetchHistoricalData(timeRange.value);
+        });
+        
+        // ==================== INITIALIZATION ====================
+        window.addEventListener('load', () => {
+            log('🚀 Dashboard initialized');
+            log(`📡 API Base URL: ${API_BASE}`);
+            log(`🌐 Page Protocol: ${window.location.protocol}`);
+            
+            // Initial load
+            refreshAll();
+            
+            // Setup auto-refresh
+            setInterval(() => {
+                fetchLatestData();
+                fetchAIStatus();
+            }, REFRESH_INTERVAL);
+            
+            setInterval(() => {
+                fetchHistoricalData(timeRange.value);
+            }, CHART_REFRESH_INTERVAL);
+            
+            log('✅ Auto-refresh activated');
+        });
+    </script>
+</body>
+</html>

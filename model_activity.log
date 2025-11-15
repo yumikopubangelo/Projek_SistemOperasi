@@ -1,0 +1,4 @@
+2025-11-05 17:40:48,425 [INFO] HEAD https://localhost:9200/ [status:200 duration:0.105s]
+2025-11-05 17:40:48,425 [INFO] Terhubung ke Elasticsearch dengan SSL.
+2025-11-05 17:40:48,431 [INFO] POST https://localhost:9200/depot_air_qc_data/_search [status:200 duration:0.006s]
+2025-11-05 17:40:48,431 [WARNING] Tidak ada data 24 jam terakhir.

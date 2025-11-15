@@ -1,55 +1,94 @@
-import requests
-import json
+# =================================================================
+# SCRIPT DUMMY (VERSI 2 - HISTORIS / RENTANG 4 HARI)
+# Tujuan: Mengisi database dengan data historis yang "panjang"
+# agar lolos validasi ML Job (Time range too short).
+# =================================================================
 import time
+import random
+from datetime import datetime, timezone, timedelta
+from elasticsearch import Elasticsearch
 
-# --- KONFIGURASI SIMULATOR ---
+# --- 1. KONFIGURASI ---
+ELASTIC_HOST = "http://localhost:9200" # <-- PENTING: Sesuaikan ini jika Flask-mu pakai https
+NAMA_INDEX = "depot_air_qc_data" 
+JUMLAH_DATA = 100 # Kita akan buat 100 data point (100 jam)
 
-# 1. GANTI DENGAN URL NGROK ANDA! (dapatkan dari terminal Ngrok)
-NGROK_URL = "https://hallucinative-emma-astronautically.ngrok-free.dev"  # Contoh, ganti ini
+# --- KONFIGURASI KONEKSI ELASTIC ---
+# (Sesuaikan ini dengan setup Elastic-mu)
+# Jika Elastic-mu (seperti di Flask) pakai HTTPS & Password, pakai ini:
+ES_HOST_URL = "https://localhost:9200"
+ES_USER = "elastic"
+ES_PASS = "3+xHEqNsZYJ*2CQoNAlG" # <-- Ganti passwordmu
+CA_CERT_PATH = "http_ca.crt" # <-- Pastikan file ini ada
 
-# 2. Kunci rahasia ini HARUS SAMA dengan yang di server Flask
-SECRET_KEY = "AAEAAWVsYXN0aWMva5liYW5hL2Vucm9sbC1wcm9jZXNzLXRva2VuLTE3NjE4NzM2OTgzNjY6bTJVX0R5eERST3VxUFpPOWotY2lHZQ"
-# ---------------------------------
+# ========================================
 
-# Ini adalah data sensor palsu yang ingin kita kirim
-data_sensor_palsu = {
-    "device_id": "simulator_01",
-    "tds_ppm": 140.2,
-    "kekeruhan_ntu": 4.2
-}
+def kirim_data_dummy_historis():
+    print("=" * 40)
+    print(f"Mencoba terhubung ke Elasticsearch di {ES_HOST_URL}...")
+    try:
+        # Gunakan koneksi AMAN (HTTPS)
+        es = Elasticsearch(
+            [ES_HOST_URL],
+            basic_auth=(ES_USER, ES_PASS),
+            ca_certs=CA_CERT_PATH
+        )
+        if not es.ping():
+            raise ValueError("Koneksi ditolak. Ping gagal.")
+        print("KONEKSI BERHASIL!")
+    except Exception as e:
+        print(f"\n[!!! GAGAL KONEKSI !!!]")
+        print("Pastikan Elastic-mu berjalan di Docker.")
+        print("Pastikan user, pass, dan file http_ca.crt sudah benar.")
+        print(f"Detail Error: {e}")
+        return
 
-# Tentukan URL lengkap + endpoint
-url_tujuan = NGROK_URL + "/sensor"
-
-# Siapkan headers, terutama 'Authorization'
-headers = {
-    "Authorization": SECRET_KEY,
-    "Content-Type": "application/json" 
-}
-
-print(f"Mengirim data simulasi ke: {url_tujuan}")
-print(f"Data: {data_sensor_palsu}")
-
-try:
-    # Kirim request POST dengan data JSON dan headers
-    # Kita menggunakan json=data_sensor_palsu agar requests otomatis 
-    # mengubah dict Python menjadi string JSON dan mengatur header Content-Type
-    # Tapi karena kita butuh header Authorization, kita atur manual:
+    # --- 2. Inilah Triknya! (Membuat Rentang Waktu Palsu) ---
+    print(f"Akan mengirim {JUMLAH_DATA} data (rentang waktu ~4 hari) ke '{NAMA_INDEX}'...")
+    print("=" * 40)
     
-    respons = requests.post(
-        url_tujuan, 
-        data=json.dumps(data_sensor_palsu), # Ubah dict ke string JSON
-        headers=headers,
-        timeout=10 # Batas waktu 10 detik
-    )
-    
-    # Tampilkan respons dari server Flask Anda
-    print("\n--- HASIL ---")
-    print(f"Status Code: {respons.status_code}")
-    print(f"Respons Server: {respons.json()}") # Tampilkan balasan JSON dari Flask
+    # Kita mulai dari 100 jam yang lalu
+    waktu_sekarang = datetime.now(timezone.utc)
+    waktu_mulai = waktu_sekarang - timedelta(hours=JUMLAH_DATA)
 
-except requests.exceptions.ConnectionError:
-    print("\nGAGAL: Tidak bisa terhubung ke URL Ngrok.")
-    print("Pastikan Ngrok berjalan dan URL-nya sudah benar.")
-except Exception as e:
-    print(f"\nGAGAL: Terjadi error. Detail: {e}")
+    try:
+        for i in range(JUMLAH_DATA):
+            # Buat data palsu (Simulasi filter sehat)
+            data_tds = random.uniform(5.0, 15.0)       
+            data_kekeruhan = random.uniform(0.1, 0.8)  
+            
+            # --- 3. Sengaja Buat ANOMALI (Data Jelek) ---
+            # Setiap 25 data (tiap 25 jam), buat 1 data anomali
+            if i % 25 == 0:
+                print(f"!!! MEMASUKKAN ANOMALI (Data Latihan) !!!")
+                data_tds = random.uniform(50.0, 60.0) # TDS tiba-tiba tinggi
+                data_kekeruhan = random.uniform(5.0, 8.0) # Kekeruhan tinggi
+            # -----------------------------------------------
+
+            # Buat stempel waktu palsu, maju 1 jam setiap data
+            waktu_data = waktu_mulai + timedelta(hours=i)
+
+            # [PENTING] Pastikan field ini SAMA PERSIS dengan MAPPING-mu
+            doc = {
+                'depot_id': 'D001_HISTORIS',
+                '@timestamp': waktu_data, # <-- INI KUNCINYA
+                'tds_ppm': round(data_tds, 2),
+                'kekeruhan_ntu': round(data_kekeruhan, 2),
+                'suhu_celsius': random.uniform(25.0, 28.0)
+            }
+
+            # Kirim langsung ke Elastic (bukan lewat Flask)
+            # Ini lebih cepat untuk mengisi data latihan
+            es.index(index=NAMA_INDEX, document=doc)
+            print(f"Data ke-{i+1} terkirim: TDS={doc['tds_ppm']} ppm (@ {waktu_data.isoformat()})")
+            
+    except Exception as e:
+        print(f"\n[!!! ERROR SAAT MENGIRIM DATA !!!]\n{e}")
+
+    print("=" * 40)
+    print(f"PENGIRIMAN DATA (RENTANG 4 HARI) SELESAI.")
+    print("SEKARANG, buka Kibana dan buat ulang ML Job-mu!")
+    print("=" * 40)
+
+if __name__ == "__main__":
+    kirim_data_dummy_historis()
