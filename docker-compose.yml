@@ -1,0 +1,78 @@
+services:
+  # ==================== ELASTICSEARCH ====================
+  elasticsearch:
+    image: elasticsearch:8.11.0
+    container_name: elasticsearch
+    environment:
+      - cluster.name=aquaguard-cluster
+      - node.name=elasticsearch
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=3+xHEqNsZYJ*2CQoNAlG
+      - xpack.security.http.ssl.enabled=true
+      - xpack.security.http.ssl.keystore.path=certs/http.p12
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.security.transport.ssl.verification_mode=certificate
+      - xpack.security.transport.ssl.keystore.path=certs/transport.p12
+      - xpack.security.transport.ssl.truststore.path=certs/transport.p12
+      - TZ=Asia/Jakarta
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+      - certs:/usr/share/elasticsearch/config/certs
+    ports:
+      - "9200:9200"
+    networks:
+      - elastic_net
+    healthcheck:
+      # [FIX] Healthcheck yang lebih sederhana - hanya cek apakah port terbuka
+      test: ["CMD-SHELL", "curl -k -s -u elastic:3+xHEqNsZYJ*2CQoNAlG https://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  # ==================== KIBANA ====================
+  kibana:
+    image: kibana:8.11.0
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=https://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=3+xHEqNsZYJ*2CQoNAlG
+      # [FIX] Sesuaikan path CA dengan struktur yang dibuat script
+      - ELASTICSEARCH_SSL_VERIFICATIONMODE=certificate
+      - ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES=/usr/share/kibana/config/certs/ca/ca.crt
+      - SERVER_NAME=kibana
+      - SERVER_HOST=0.0.0.0
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=a7a6311933d3503b89bc2dbc36572c33a6c10925682e591bffcab6911c06786d
+      - XPACK_REPORTING_ENCRYPTIONKEY=c7a8f9e3d2b1a0f4e5d6c7b8a9f0e1d2c3b4a5f6e7d8c9b0a1f2e3d4c5b6a7f8
+      - XPACK_SECURITY_ENCRYPTIONKEY=b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9
+      - TZ=Asia/Jakarta
+    volumes:
+      - certs:/usr/share/kibana/config/certs:ro
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - elastic_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:5601/api/status || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+
+# ==================== VOLUMES & NETWORKS ====================
+volumes:
+  esdata:
+    driver: local
+  certs:
+    driver: local
+networks:
+  elastic_net:
+    driver: bridge
